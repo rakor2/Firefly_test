@@ -1,5 +1,7 @@
 print("[S][FIREFLY]")
 
+character = nil
+
 fireflyExists = 0
 
 fireFlyPositionOffsetX = 0 --Noth/Sounth
@@ -64,6 +66,40 @@ local function FireflyDeleteAndUnSub()
     FireflyDelete()
 end
 
+
+Ext.Osiris.RegisterListener('CastSpell', 5, 'after', function(caster, spell)
+    if spell == "Projectile_EldritchBlast" then
+        character = caster
+        -- print("[S][FIREFLY] Character:", character)
+        -- print("[S][FIREFLY]", "Caster:", caster, "Spell:", spell)
+            Osi.ApplyStatus(caster, "POTION_OF_STRENGTH_HILL_GIANT", -1, 1) -- -1 stands for permanent, but if it's not flagged as IgnoreResting, it's gonna last until long rest
+        print("[S][FIREFLY]: POTION_OF_STRENGTH_HILL_GIANT status applied  ")
+    end
+end)
+
+
+Ext.Osiris.RegisterListener("StatusApplied", 4, "after", function(character, status, causee, _)
+    	if status == "POTION_OF_STRENGTH_HILL_GIANT" then
+            print("[S][FIREFLY] Firefly attached")
+            FireflyCreateAndSub()
+        end
+end)
+
+
+Ext.Osiris.RegisterListener("StatusRemoved", 4, "after", function (character, status, _, _)
+    if status == "POTION_OF_STRENGTH_HILL_GIANT" then
+        print("[S][FIREFLY] Firefly detached")
+        FireflyDeleteAndUnSub()
+    end
+end)
+
+-- Ext.Osiris.RegisterListener("StatusApplied", 4, "after", function(character, status, causee, _)
+--     if status  then
+--         print("[S][FIREFLY] Status:", status)
+--     end
+-- end)
+
+
 --Console commands
 --Example: !ffC creates the light
 Ext.RegisterConsoleCommand("ffC", FireflyCreate);
@@ -77,8 +113,6 @@ Ext.RegisterConsoleCommand("ffDnU",  FireflyDeleteAndUnSub);
 
 
 
-
-
 --NEEDED STUFF
 -- https://mod.io/g/baldursgate3/r/adding-a-new-spell-projectile
 -- https://mod.io/g/baldursgate3/r/adding-a-new-spell-basic
@@ -87,12 +121,6 @@ Ext.RegisterConsoleCommand("ffDnU",  FireflyDeleteAndUnSub);
 --     print(caster .. ' casted spell "' .. spellName .. '")
 --   end)
 
-
--- Ext.Osiris.RegisterListener("CastSpell", 5, "after", function(caster, spell)
---     if spell then 
---         Osi.ApplyStatus(caster, "SpellPoint_Interrupt_Restore_1", 1, 0)
---     end
--- end)
 
 -- Ext.Osiris.RegisterListener("CastSpell", 5, "after", function(caster, spell)
 --     if spell == "Target_Attune_Orcus" then
@@ -125,6 +153,12 @@ Ext.RegisterConsoleCommand("ffDnU",  FireflyDeleteAndUnSub);
 -- 		local ltstatus = "LIFE_TRANSFERENCE_HP_" .. hp
 -- 		Osi.ApplyStatus(character,ltstatus,0.0,1,causee)
 
+
+-- Ext.Osiris.RegisterListener("CastSpell", 5, "before", function(caster, spell, spellType, spellElement, storyActionID)
+--     local casterEntity = Ext.Entity.Get(caster)
+--     casterEntity.SpellCastIsCasting.Cast = nil
+--     casterEntity:Replicate("SpellCastIsCasting")
+-- end)
 
 -- <Enumeration Name="SummonDuration">
 -- <Label>UntilLongRest</Label>
