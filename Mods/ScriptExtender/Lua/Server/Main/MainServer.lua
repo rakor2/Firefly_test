@@ -1,12 +1,11 @@
 print("[S][FIREFLY]")
 
-character = nil
 
 fireFlyPositionOffsetX = 0 -- Position offset for East/West 
 fireFlyPositionOffsetY = 2 -- Position offset for Up/Down
 fireFlyPositionOffsetZ = 1 -- Position offset for North/South
 
-fireFlyUUID = {}
+fireFlyUUID = {} --table for light UUIDs
 createdFireFlyUUIDs = {}
 charactersWhoGotStatus = {}
 characterFireflyMap = {}
@@ -31,7 +30,7 @@ Ext.Osiris.RegisterListener('CastSpell', 5, 'after', function(caster, spell)
     end
 end)
 
--- Listener for when any status is applied to a character
+-- Listener for any status applied to a character
 Ext.Osiris.RegisterListener("StatusApplied", 4, "after", function(character, status, causee, _)
     -- Check if the applied status is POTION_OF_STRENGTH_HILL_GIANT
     if status == "POTION_OF_STRENGTH_HILL_GIANT" then
@@ -43,34 +42,34 @@ Ext.Osiris.RegisterListener("StatusApplied", 4, "after", function(character, sta
         -- Get the position of the character
         local x, y, z = Osi.GetPosition(character)
 
-        -- Update the firefly index based on how many lights have been created
+        -- Update the light index based on how many lights have been created
         local fireflyIndex = #createdFireFlyUUIDs + 1
 
         -- Create a new light at the character's position and store its UUID
         fireFlyUUID[fireflyIndex] = Osi.CreateAt(FireflyGUID, x, y, z, 0, 1, "")
 
-        -- Map the character to the newly created lgiht UUID
+        -- Link (map) the character to the newly created lgiht UUID
         characterFireflyMap[character] = fireFlyUUID[fireflyIndex]
 
         -- Add the new light UUID to the createdFireFlyUUIDs table
         table.insert(createdFireFlyUUIDs, fireFlyUUID[fireflyIndex])
 
         -- Check if the character already has a position update subscription
-        if positionUpdateSubscriptions[character] then return end
+        if positionUpdateSubscriptions[character] then return end --if it has one, then do nothing
 
         -- Create a new subscription to track the character's new position every tick
         positionUpdateSubscriptions[character] = Ext.Events.Tick:Subscribe(function()
-            
+
             -- Get the character's position every tick
             local x, y, z = Osi.GetPosition(character)
 
             -- Update the position in the charactersPositions table
             charactersPositions[character] = {x = x, y = y, z = z}
 
-            -- Get the light UUID linked to the character
+            -- Get the light UUID mapped to the character
             local fireflyToTransform = characterFireflyMap[character]
 
-            -- Update the light's position with offsets
+            -- Update the light's position with offsets and 0 rotation
             Osi.ToTransform(fireflyToTransform, x + fireFlyPositionOffsetX, y + fireFlyPositionOffsetY, z + fireFlyPositionOffsetZ, 0, 0, 0)
         end)
 
@@ -78,21 +77,21 @@ Ext.Osiris.RegisterListener("StatusApplied", 4, "after", function(character, sta
     end
 end)
 
--- Listener for when a status is removed from a character
+-- Listener for status removed from a character
 Ext.Osiris.RegisterListener("StatusRemoved", 4, "after", function(character, status, _, _)
     if status == "POTION_OF_STRENGTH_HILL_GIANT" then
         -- If the "POTION_OF_STRENGTH_HILL_GIANT" status is removed, detach the light
 
-        -- Get the light linked to the character.
+        -- Get the light mapped to the character.
         local fireflyToDelete = characterFireflyMap[character]
 
-        -- If a light exists for this character, delete it
+        -- If a light exists for the character, delete it
         if fireflyToDelete then
             Osi.RequestDelete(fireflyToDelete)
             characterFireflyMap[character] = nil
         end
 
-        -- Unsubscribe from the position update  for the character
+        -- Unsubscribe from the position update for the character
         local subscriptionToUnsubscribe = positionUpdateSubscriptions[character]
         if subscriptionToUnsubscribe then
             Ext.Events.Tick:Unsubscribe(subscriptionToUnsubscribe)
@@ -110,7 +109,7 @@ Ext.Osiris.RegisterListener("StatusRemoved", 4, "after", function(character, sta
             end
         end
 
-        -- Remove the firefly UUID from the createdFireFlyUUIDs table
+        -- Remove the light UUID from the createdFireFlyUUIDs table
         for i, ffUuid in ipairs(createdFireFlyUUIDs) do
             if ffUuid == fireflyToDelete then
                 table.remove(createdFireFlyUUIDs, i)
