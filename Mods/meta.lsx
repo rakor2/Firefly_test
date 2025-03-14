@@ -15,6 +15,14 @@
                             <attribute id="UUID" type="guid" value="28ac9ce2-2aba-8cda-b3b5-6e922f71b6b8"/>
                             <attribute id="Version64" type="int64" value="145100779997082619"/>
                         </node>
+                        <node id="ModuleShortDesc">
+                            <attribute id="Folder" type="LSString" value="BG3MCM"/>
+                            <attribute id="MD5" type="LSString" value=""/>
+                            <attribute id="Name" type="LSString" value="Mod Configuration Menu"/>
+                            <attribute id="PublishHandle" type="uint64" value="0"/>
+                            <attribute id="UUID" type="guid" value="755a8a72-407f-4f0d-9a33-274ac0f0b53d"/>
+                            <attribute id="Version64" type="int64" value="39125021762781184"/>
+                        </node>
                     </children>
                 </node>
                 <node id="ModuleInfo">

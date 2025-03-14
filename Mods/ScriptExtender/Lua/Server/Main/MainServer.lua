@@ -2,113 +2,183 @@ print("[S][FIREFLY]")
 
 character = nil
 
-fireflyExists = 0
+-- fireflyExists = 0
 
 fireFlyPositionOffsetX = 0 --Noth/Sounth
 fireFlyPositionOffsetY = 2 --Up/Down
 fireFlyPositionOffsetZ = 1 --East/West
 
+fireFlyUUID = {}
+createdFireFlyUUIDs = {}
+charactersWhoCasted = {}
+characterFireflyMap = {}
+castersPositions = {}
 
-local function FireflyCreate()
-    pos = GetHostPositionServer()
-    if fireflyExists == 1 then
-        print("[S][FIREFLY] Firefly exists, can't summon a new one")
-    else
-        fireFlyUUID = Osi.CreateAt(FireflyGUID, pos.x, pos.y, pos.z, 0, 1, "")
-        fireflyExists = 1
-    end
-end
+positionUpdateSubscriptions = {}
 
-
-local function FireflyDelete()
-    Osi.RequestDelete(fireFlyUUID)
-    fireflyExists = 0
-end
-
-
-local function StartPositionUpdates() --Updates light's position every tick
-    if fireflyExists == 1 then
-    if positionUpdateSubscription then return end --If positionUpdateSubscription = nil, then no sibscribe 
-        positionUpdateSubscription = Ext.Events.Tick:Subscribe(function()
-            local pos = GetHostPositionServer()
-            Osi.ToTransform(fireFlyUUID, pos.x+fireFlyPositionOffsetX, pos.y+fireFlyPositionOffsetY, pos.z+fireFlyPositionOffsetZ, 0, 0, 0)
-        end)
-        print("[S][FIREFLY] Tick subscribtion started")
-    else 
-        print("[S][FIREFLY] No firefly creted, can not subscribe to tick")
-    end
-end
-
-
-local function StopPositionUpdates()
-    if positionUpdateSubscription then
-        Ext.Events.Tick:Unsubscribe(positionUpdateSubscription)
-        positionUpdateSubscription = nil
-        print("[S][FIREFLY] Tick subscribtion ended")
-    end
-end
-
-
-local function FireflyPositionToCharacter()
-    pos = GetHostPositionServer()
-    Osi.ToTransform(fireFlyUUID, pos.x, pos.y, pos.z, 0, 0, 0)
-end
-
-
-local function FireflyCreateAndSub()
-    FireflyCreate()
-    StartPositionUpdates()
-end
-
-
-local function FireflyDeleteAndUnSub()
-    StopPositionUpdates()
-    FireflyDelete()
-end
 
 
 Ext.Osiris.RegisterListener('CastSpell', 5, 'after', function(caster, spell)
     if spell == "Projectile_EldritchBlast" then
-        character = caster
-        -- print("[S][FIREFLY] Character:", character)
-        -- print("[S][FIREFLY]", "Caster:", caster, "Spell:", spell)
-            Osi.ApplyStatus(caster, "POTION_OF_STRENGTH_HILL_GIANT", -1, 1) -- -1 stands for permanent, but if it's not flagged as IgnoreResting, it's gonna last until long rest
-        print("[S][FIREFLY]: POTION_OF_STRENGTH_HILL_GIANT status applied  ")
+        if Osi.HasActiveStatus(caster, "POTION_OF_STRENGTH_HILL_GIANT") == 1 then
+            Osi.RemoveStatus(caster, "POTION_OF_STRENGTH_HILL_GIANT")
+            print("[S][FIREFLY] Status removed:", caster)
+        else
+            Osi.ApplyStatus(caster, "POTION_OF_STRENGTH_HILL_GIANT", -1, 1)  -- -1 stands for permanent, but if it's not flagged as IgnoreResting, it's gonna last until long rest
+            print("[S][FIREFLY] Status applied to:", caster)
+        end
     end
 end)
 
 
 Ext.Osiris.RegisterListener("StatusApplied", 4, "after", function(character, status, causee, _)
-    	if status == "POTION_OF_STRENGTH_HILL_GIANT" then
-            print("[S][FIREFLY] Firefly attached")
-            FireflyCreateAndSub()
-        end
+    if status == "POTION_OF_STRENGTH_HILL_GIANT" then
+        print("[S][FIREFLY] POTION_OF_STRENGTH_HILL_GIANT status found on:", character)
+
+        table.insert(charactersWhoCasted, character)
+        -- _D(charactersWhoCasted)
+
+        local x, y, z = Osi.GetPosition(character)
+        -- print("[S][FIREFLY] Position:", character, x, y, z)
+
+        local fireflyIndex = #createdFireFlyUUIDs + 1
+        fireFlyUUID[fireflyIndex] = Osi.CreateAt(FireflyGUID, x, y, z, 0, 1, "")
+
+        characterFireflyMap[character] = fireFlyUUID[fireflyIndex]
+        table.insert(createdFireFlyUUIDs, fireFlyUUID[fireflyIndex])
+
+        -- _D(createdFireFlyUUIDs)
+        -- print(characterFireflyMap[character], "=", fireFlyUUID[fireflyIndex])
+        -- print("========================================================================")
+
+        if positionUpdateSubscriptions[character] then return end
+
+        positionUpdateSubscriptions[character] = Ext.Events.Tick:Subscribe(function() --Subscribtions for each caster
+            local x, y, z = Osi.GetPosition(character)
+            castersPositions[character] = {x = x, y = y, z = z}
+
+            local fireflyToTransform = characterFireflyMap[character]
+            Osi.ToTransform(fireflyToTransform, x + fireFlyPositionOffsetX, y + fireFlyPositionOffsetY, z + fireFlyPositionOffsetZ, 0, 0, 0)
+        end)
+
+        print("[S][FIREFLY] Tick subscription started for", character)
+    end
 end)
+
 
 
 Ext.Osiris.RegisterListener("StatusRemoved", 4, "after", function (character, status, _, _)
     if status == "POTION_OF_STRENGTH_HILL_GIANT" then
-        print("[S][FIREFLY] Firefly detached")
-        FireflyDeleteAndUnSub()
+
+        local fireflyToDelete = characterFireflyMap[character]
+        if fireflyToDelete then
+            Osi.RequestDelete(fireflyToDelete)
+            characterFireflyMap[character] = nil
+        end
+
+        local subscriptionToUnsubscribe = positionUpdateSubscriptions[character]
+        if subscriptionToUnsubscribe  then
+            Ext.Events.Tick:Unsubscribe(subscriptionToUnsubscribe )
+            positionUpdateSubscriptions[character] = nil
+        end
+
+        castersPositions[character] = nil
+
+        for i, caster in ipairs(charactersWhoCasted) do
+            if caster == character then
+                table.remove(charactersWhoCasted, i)
+                break
+            end
+        end
+
+        for i, ffUuid in ipairs(createdFireFlyUUIDs) do
+            if ffUuid == fireflyToDelete then
+                table.remove(createdFireFlyUUIDs, i)
+                break
+            end
+        end
+
+        print("[S][FIREFLY] Firefly detached and tables cleared for:", character)
     end
 end)
 
--- Ext.Osiris.RegisterListener("StatusApplied", 4, "after", function(character, status, causee, _)
---     if status  then
---         print("[S][FIREFLY] Status:", status)
---     end
--- end)
 
+
+-- local function FireflyCreate()
+--     pos = GetHostPositionServer()
+--     if fireflyExists == 1 then
+--         print("[S][FIREFLY] Firefly exists, can't summon a new one")
+--     else
+--         fireFlyUUID = Osi.CreateAt(FireflyGUID, pos.x, pos.y, pos.z, 0, 1, "")
+--         fireflyExists = 1
+--     end
+-- end
+
+
+-- local function FireflyDelete()
+--     for i = 1, #createdFireFlyUUIDs do
+--     Osi.RequestDelete(createdFireFlyUUIDs[i])
+--     end
+--     -- fireflyExists = 0
+-- end
+
+
+-- local function StartPositionUpdates() --Updates light's position every tick
+--     if fireflyExists == 1 then
+--     if positionUpdateSubscription then return end --If positionUpdateSubscription = nil, then no sibscribe 
+--         positionUpdateSubscription = Ext.Events.Tick:Subscribe(function()
+--             -- local pos = GetHostPositionServer()
+--             -- Osi.ToTransform(fireFlyUUID, pos.x+fireFlyPositionOffsetX, pos.y+fireFlyPositionOffsetY, pos.z+fireFlyPositionOffsetZ, 0, 0, 0)
+            
+--         end)
+--         print("[S][FIREFLY] Tick subscribtion started")
+--     else 
+--         print("[S][FIREFLY] No firefly creted, can not subscribe to tick")
+--     end
+-- end
+
+
+-- local function StopPositionUpdates()
+--     if positionUpdateSubscription2 then
+--     Ext.Events.Tick:Unsubscribe(positionUpdateSubscription2)
+--     positionUpdateSubscription2 = nil
+--     elseif positionUpdateSubscription then
+--         Ext.Events.Tick:Unsubscribe(positionUpdateSubscription)
+--         positionUpdateSubscription = nil
+--         print("[S][FIREFLY] Tick subscribtion ended")
+--     end
+-- end
+
+
+-- local function FireflyPositionToCharacter()
+--     pos = GetHostPositionServer()
+--     Osi.ToTransform(fireFlyUUID, pos.x, pos.y, pos.z, 0, 0, 0)
+-- end
+
+
+-- local function FireflyCreateAndSub()
+--     FireflyCreate()
+--     StartPositionUpdates()
+-- end
+
+
+-- local function FireflyDeleteAndUnSub()
+--     StopPositionUpdates()
+--     FireflyDelete()
+-- end
 
 --Console commands
 --Example: !ffC creates the light
-Ext.RegisterConsoleCommand("ffC", FireflyCreate);
-Ext.RegisterConsoleCommand("ffD",  FireflyDelete);
-Ext.RegisterConsoleCommand("ffPTC",  FireflyPositionToCharacter);
-Ext.RegisterConsoleCommand("ffSubT",  StartPositionUpdates);
-Ext.RegisterConsoleCommand("ffSubF",  StopPositionUpdates);
-Ext.RegisterConsoleCommand("ffCnS",  FireflyCreateAndSub);
-Ext.RegisterConsoleCommand("ffDnU",  FireflyDeleteAndUnSub);
+-- Ext.RegisterConsoleCommand("ffC", FireflyCreate);
+-- Ext.RegisterConsoleCommand("ffD",  FireflyDelete);
+-- Ext.RegisterConsoleCommand("ffPTC",  FireflyPositionToCharacter);
+-- Ext.RegisterConsoleCommand("ffSubT",  StartPositionUpdates);
+-- Ext.RegisterConsoleCommand("ffSubF",  StopPositionUpdates);
+-- Ext.RegisterConsoleCommand("ffCnS",  FireflyCreateAndSub);
+-- Ext.RegisterConsoleCommand("ffDnU",  FireflyDeleteAndUnSub);
+
+
+
 
 
 

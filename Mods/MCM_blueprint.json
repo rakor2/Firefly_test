@@ -1,0 +1,11 @@
+{
+    "SchemaVersion": 1,
+    "ModName": "Firefly vfx test",
+    "Tabs": [
+        {
+            "TabId": "FF-main",
+            "TabName": "Firefly vfx test"
+
+        }
+    ]
+}
